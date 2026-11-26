@@ -49,6 +49,18 @@ jobs:
         if: steps.keys.outputs.ok == 'true'
         working-directory: backend
         run: npm test
+      - name: Preflight database check
+        if: steps.keys.outputs.ok == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://rfsmywipfwpwclgjammf.supabase.co' }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          code=$(curl -s -o /tmp/r.txt -w '%{http_code}' -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" "$SUPABASE_URL/rest/v1/config?select=key&limit=1" || true)
+          if [ "$code" != "200" ]; then
+            echo "::error title=Supabase check failed::HTTP $code from host ${SUPABASE_URL#https://} | key length ${#SUPABASE_SERVICE_KEY}, starts with ${SUPABASE_SERVICE_KEY:0:3} | $(head -c 200 /tmp/r.txt)"
+            exit 1
+          fi
+          echo "Supabase reachable and key accepted"
       - name: Run pipeline
         if: steps.keys.outputs.ok == 'true'
         working-directory: backend

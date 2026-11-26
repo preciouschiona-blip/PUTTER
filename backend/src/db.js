@@ -8,7 +8,11 @@ async function rest(path, { method = 'GET', body, prefer } = {}) {
     headers: { apikey: KEY(), Authorization: `Bearer ${KEY()}`, 'Content-Type': 'application/json', ...(prefer ? { Prefer: prefer } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Supabase ${method} ${path.split('?')[0]} -> ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const msg = `Supabase ${method} ${path.split('?')[0]} -> ${res.status} ${(await res.text()).slice(0, 300)}`;
+    console.error(`::error title=Database request failed::${msg}`);
+    throw new Error(msg);
+  }
   const t = await res.text();
   return t ? JSON.parse(t) : null;
 }
