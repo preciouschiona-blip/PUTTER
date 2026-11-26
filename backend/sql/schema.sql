@@ -167,3 +167,10 @@ drop trigger if exists tickets_protect_del on tickets;
 create trigger tickets_protect_del before delete on tickets for each row execute function tickets_protect();
 alter table tickets enable row level security;
 drop policy if exists read_tickets on tickets; create policy read_tickets on tickets for select to anon using (true);
+
+-- API role privileges (newer Supabase projects do not grant these automatically).
+grant usage on schema public to anon, service_role;
+grant all on all tables in schema public to service_role;
+grant select on all tables in schema public to anon;
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant select on tables to anon;
