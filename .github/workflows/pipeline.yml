@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: '0 5 * * *'    # morning run (UTC)
     - cron: '0 12 * * *'   # midday refresh for evening kick-offs
+  push:
+    paths: ['.github/run-pipeline.txt']   # edit that file (first line "demo" or "live") to trigger a run
   workflow_dispatch:
     inputs:
       demo:
@@ -20,6 +22,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
+      - id: mode
+        name: Decide demo or live
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_DEMO: ${{ inputs.demo }}
+        run: |
+          demo=0
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$INPUT_DEMO" = "true" ]; then demo=1; fi
+          if [ "$EVENT" = "push" ] && head -n1 .github/run-pipeline.txt | grep -qi '^demo'; then demo=1; fi
+          echo "demo=$demo" >> "$GITHUB_OUTPUT"
       - id: keys
         name: Check required secrets
         env:
@@ -27,11 +39,11 @@ jobs:
           AF: ${{ secrets.API_FOOTBALL_KEY }}
           OD: ${{ secrets.ODDS_API_KEY }}
           EVENT: ${{ github.event_name }}
-          DEMO: ${{ inputs.demo }}
+          DEMO: ${{ steps.mode.outputs.demo }}
         run: |
           ok=true
           if [ -z "$SB" ]; then ok=false; echo "::notice::SUPABASE_SERVICE_KEY is not set, skipping."; fi
-          if [ "$DEMO" != "true" ] && { [ -z "$AF" ] || [ -z "$OD" ]; }; then ok=false; echo "::notice::API_FOOTBALL_KEY / ODDS_API_KEY not set, skipping (tick demo to run sample data)."; fi
+          if [ "$DEMO" != "1" ] && { [ -z "$AF" ] || [ -z "$OD" ]; }; then ok=false; echo "::notice::API_FOOTBALL_KEY / ODDS_API_KEY not set, skipping (tick demo to run sample data)."; fi
           echo "ok=$ok" >> "$GITHUB_OUTPUT"
       - name: Unit tests (engine must pass before publishing)
         if: steps.keys.outputs.ok == 'true'
@@ -45,5 +57,5 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-          DEMO: ${{ inputs.demo && '1' || '0' }}
+          DEMO: ${{ steps.mode.outputs.demo }}
         run: npm run pipeline
