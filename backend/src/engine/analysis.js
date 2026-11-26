@@ -36,8 +36,9 @@ export function analyseFixture(bundle, cfg = DEFAULT_CONFIG) {
     let view; try { view = marketView(pred, id); } catch { continue; }
     const ev = evaluateSelection({
       odds: sel.best, pModel: view.win, pPush: view.push, pMarketFair: fairByGroup.get(id) ?? null,
-      quality: pred.quality, spread: view.spread, modelSd: 0.02 + 0.25 * view.spread + 0.1 / Math.sqrt(pred.sampleSize), oddsVerified: !bundle.isDemo,
+      quality: pred.quality, spread: view.spread, modelSd: 0.02 + 0.25 * view.spread + 0.1 / Math.sqrt(pred.sampleSize), oddsVerified: true,
     }, cfg);
+    if (bundle.isDemo) { ev.reasons.push('Demonstration data with synthetic odds'); if (ev.grade === 'GREEN') ev.grade = 'AMBER'; }
     candidates.push({ id, sel, view, ev, score: rankScore(ev, pred.quality) });
   }
   candidates.sort((a, b) => b.score - a.score);

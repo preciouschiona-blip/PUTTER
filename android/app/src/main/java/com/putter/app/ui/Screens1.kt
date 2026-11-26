@@ -62,6 +62,7 @@ fun StatusBanners(s: UiState) {
 @Composable
 fun HomeScreen(s: UiState, onPick: (PickDto) -> Unit, goTo: (Int) -> Unit) {
     val green = s.picks.filter { upcoming(it) && it.grade == "GREEN" }.sortedByDescending { it.score ?: 0.0 }
+    val tickets = todaysTickets(s)
     val analysed = s.fixtures.count { it.analysisStatus == "analysed" && parseTime(it.kickoff) > now() }
     val live = s.picks.filter { it.isDemo != true && it.grade == "GREEN" }
     val pf = perf(live)
@@ -71,13 +72,13 @@ fun HomeScreen(s: UiState, onPick: (PickDto) -> Unit, goTo: (Int) -> Unit) {
         StatusBanners(s)
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             AppCard(Modifier.weight(1f)) { Stat("Matches analysed", "$analysed") }
-            AppCard(Modifier.weight(1f)) { Stat("Qualified (GREEN)", "${green.size}", Green) }
+            AppCard(Modifier.weight(1f)) { Stat("Tickets today", "${tickets.size}/3", Green) }
             AppCard(Modifier.weight(1f)) { Stat("Overall ROI", if (pf.won + pf.lost > 0) signed(pf.roi) + "%" else "–", if (pf.roi >= 0) Green else Red) }
         }
-        SectionTitle("Today's top picks")
-        if (green.isEmpty()) EmptyState("No qualified selections right now", "Putter only publishes selections that clear every value and reliability check. Quiet days are normal and are not filled with weaker tips.")
-        else green.take(3).forEach { PickCard(it, { onPick(it) }) }
-        if (green.size > 3) Text("See all in Today's Picks →", color = Green, modifier = Modifier.padding(8.dp).clickable { goTo(1) })
+        SectionTitle("Today's tickets")
+        if (tickets.isEmpty()) EmptyState("No tickets right now", "Putter only builds a ticket from selections that clear every value and reliability check. Quiet days are normal and are not filled with weaker tips.")
+        else tickets.take(3).forEach { TicketCard(it, compact = true) }
+        Text("Open Today's Picks for the full detail of each ticket", color = Green, fontSize = 13.sp, modifier = Modifier.padding(8.dp).clickable { goTo(1) })
 
         SectionTitle("Recent performance (GREEN picks)")
         if (recent.isEmpty()) Text("No settled predictions yet.", color = Grey, fontSize = 13.sp)
@@ -121,27 +122,38 @@ fun FixtureRow(f: FixtureDto) {
 @Composable
 fun PicksScreen(s: UiState, onPick: (PickDto) -> Unit) {
     var tab by rememberSaveable { mutableStateOf(0) }
+    val tickets = todaysTickets(s)
     val all = s.picks.filter { upcoming(it) }.sortedByDescending { it.score ?: 0.0 }
     val green = all.filter { it.grade == "GREEN" }; val amber = all.filter { it.grade == "AMBER" }
     Column {
         StatusBanners(s)
         TabRow(selectedTabIndex = tab, containerColor = Navy, contentColor = Green) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("GREEN (${green.size})") })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("AMBER (${amber.size})") })
+            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("TICKETS (${tickets.size})") })
+            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("SINGLES (${green.size})") })
+            Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("AMBER (${amber.size})") })
         }
         Spacer(Modifier.height(8.dp))
-        if (tab == 1) Banner("AMBER selections show potential value but with notable uncertainty (limited data, models disagreeing, or value that disappears under a conservative estimate). Explore them with extra caution.")
-        val list = if (tab == 0) green else amber
-        if (list.isEmpty()) EmptyState(
-            if (tab == 0) "No qualified selections today" else "No AMBER selections",
-            "Putter never generates picks just to fill the page. Check back after the next refresh.",
-        )
-        val today = list.filter { isToday(parseTime(it.kickoff)) }
-        val later = list.filter { !isToday(parseTime(it.kickoff)) }
-        if (today.isNotEmpty()) { SectionTitle("Today"); today.forEach { PickCard(it) { onPick(it) } } }
-        if (later.isNotEmpty()) { SectionTitle("Upcoming days"); later.forEach { PickCard(it) { onPick(it) } } }
+        if (tab == 0) {
+            Text("Up to three tickets a day, each a different mix of matches and markets. A match appears in more than one ticket only when it is one of the day's strongest selections.", color = Grey, fontSize = 12.sp)
+            if (tickets.isEmpty()) EmptyState("No tickets today", "A ticket needs at least three qualified selections from different matches. Putter does not pad tickets with weak picks, so some days have fewer than three.")
+            tickets.forEach { TicketCard(it) }
+        } else {
+            if (tab == 2) Banner("AMBER selections show potential value but with notable uncertainty (limited data, models disagreeing, or value that disappears under a conservative estimate). Explore them with extra caution.")
+            val list = if (tab == 1) green else amber
+            if (list.isEmpty()) EmptyState(
+                if (tab == 1) "No qualified single selections" else "No AMBER selections",
+                "Putter never generates picks just to fill the page. Check back after the next refresh.",
+            )
+            val today = list.filter { isToday(parseTime(it.kickoff)) }
+            val later = list.filter { !isToday(parseTime(it.kickoff)) }
+            if (today.isNotEmpty()) { SectionTitle("Today"); today.forEach { PickCard(it) { onPick(it) } } }
+            if (later.isNotEmpty()) { SectionTitle("Upcoming days"); later.forEach { PickCard(it) { onPick(it) } } }
+        }
     }
 }
+
+fun todaysTickets(s: UiState) = s.tickets.filter { parseTime(it.lastKickoff) > now() && it.result == "PENDING" }
+    .sortedWith(compareByDescending<com.putter.app.data.TicketDto> { it.ticketDate }.thenBy { it.slot })
 
 @Composable
 fun PickDetail(p: PickDto, onBack: () -> Unit) {

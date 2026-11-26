@@ -27,8 +27,11 @@ test('odds feed summary: best price, average, groups', () => {
 });
 
 test('demo bundles are flagged and can never be GREEN', () => {
+  let n = 0;
   for (const b of demoBundles(new Date('2026-12-01T10:00:00Z'))) {
     const r = analyseFixture(b);
     assert.ok(r.picks.every(p => p.is_demo && p.grade !== 'GREEN'));
+    n += r.picks.length;
   }
+  assert.ok(n > 0, 'demo mode must actually produce demo picks');
 });

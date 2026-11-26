@@ -117,3 +117,53 @@ insert into config (key, value) values
   ('odds_sport_keys', '["soccer_epl","soccer_efl_champ","soccer_spain_la_liga","soccer_italy_serie_a","soccer_germany_bundesliga","soccer_france_ligue_one","soccer_uefa_champs_league","soccer_uefa_europa_league","soccer_uefa_europa_conference_league","soccer_fa_cup","soccer_spain_copa_del_rey"]'),
   ('leagues_enabled', '[]')
 on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Daily tickets (up to three multi-selection slips per day built from published picks)
+-- ---------------------------------------------------------------------------
+create table if not exists tickets (
+  id uuid primary key default gen_random_uuid(),
+  ticket_date date not null,
+  slot integer not null check (slot between 1 and 3),
+  name text not null,
+  strategy text not null,
+  grade text not null check (grade in ('GREEN','AMBER')),
+  legs jsonb not null,
+  combined_odds numeric not null,
+  probability numeric not null,
+  ev numeric not null,
+  risk text,
+  first_kickoff timestamptz not null,
+  last_kickoff timestamptz not null,
+  note text,
+  is_demo boolean not null default false,
+  published_at timestamptz not null default now(),
+  result text not null default 'PENDING' check (result in ('PENDING','WON','LOST','VOID')),
+  profit numeric,
+  leg_results jsonb,
+  settled_at timestamptz,
+  unique (ticket_date, slot, is_demo)
+);
+create index if not exists tickets_date_idx on tickets (ticket_date desc);
+
+create or replace function tickets_protect() returns trigger language plpgsql as $$
+begin
+  if tg_op = 'DELETE' then raise exception 'Published tickets cannot be deleted'; end if;
+  if (new.id, new.ticket_date, new.slot, new.name, new.strategy, new.grade, new.legs, new.combined_odds, new.probability,
+      new.ev, new.first_kickoff, new.last_kickoff, new.is_demo, new.published_at)
+     is distinct from
+     (old.id, old.ticket_date, old.slot, old.name, old.strategy, old.grade, old.legs, old.combined_odds, old.probability,
+      old.ev, old.first_kickoff, old.last_kickoff, old.is_demo, old.published_at) then
+    raise exception 'Published tickets are immutable';
+  end if;
+  if old.result <> 'PENDING' and new.result is distinct from old.result then
+    raise exception 'A settled ticket result cannot be changed';
+  end if;
+  return new;
+end $$;
+drop trigger if exists tickets_protect_upd on tickets;
+create trigger tickets_protect_upd before update on tickets for each row execute function tickets_protect();
+drop trigger if exists tickets_protect_del on tickets;
+create trigger tickets_protect_del before delete on tickets for each row execute function tickets_protect();
+alter table tickets enable row level security;
+drop policy if exists read_tickets on tickets; create policy read_tickets on tickets for select to anon using (true);

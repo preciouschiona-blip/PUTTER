@@ -18,6 +18,9 @@ data class PickEntity(@PrimaryKey val id: String, val kickoffMs: Long, val json:
 @Entity(tableName = "fixtures")
 data class FixtureEntity(@PrimaryKey val id: String, val kickoffMs: Long, val json: String)
 
+@Entity(tableName = "tickets")
+data class TicketEntity(@PrimaryKey val id: String, val kickoffMs: Long, val json: String)
+
 @Entity(tableName = "meta")
 data class MetaEntity(@PrimaryKey val key: String, val value: String)
 
@@ -28,6 +31,15 @@ interface PutterDao {
 
     @Query("SELECT * FROM fixtures ORDER BY kickoffMs ASC")
     fun fixtures(): Flow<List<FixtureEntity>>
+
+    @Query("SELECT * FROM tickets ORDER BY kickoffMs DESC")
+    fun tickets(): Flow<List<TicketEntity>>
+
+    @Query("DELETE FROM tickets")
+    suspend fun clearTickets()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTickets(items: List<TicketEntity>)
 
     @Query("SELECT * FROM meta")
     fun meta(): Flow<List<MetaEntity>>
@@ -51,7 +63,7 @@ interface PutterDao {
     suspend fun putMeta(item: MetaEntity)
 }
 
-@Database(entities = [PickEntity::class, FixtureEntity::class, MetaEntity::class], version = 1, exportSchema = false)
+@Database(entities = [PickEntity::class, FixtureEntity::class, TicketEntity::class, MetaEntity::class], version = 2, exportSchema = false)
 abstract class PutterDb : RoomDatabase() {
     abstract fun dao(): PutterDao
 

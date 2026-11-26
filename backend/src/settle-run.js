@@ -2,6 +2,7 @@
 import * as db from './db.js';
 import * as fb from './providers/apiFootball.js';
 import { settlePick, isFinal, isVoidState } from './engine/settle.js';
+import { settleTicket } from './engine/tickets.js';
 import { apiCalls } from './http.js';
 
 const [run] = await db.insertRun([{ kind: 'settle' }]);
@@ -24,7 +25,25 @@ try {
       await db.patch('picks', `id=eq.${p.id}`, { result: 'VOID', profit: 0, settled_at: now }); settled++;
     }
   }
-  await db.patchRun(run.id, { finished_at: new Date().toISOString(), ok: true, message: `settled ${settled} of ${pending.length} pending`, api_calls: apiCalls() });
+  // tickets: derive from the settled single picks
+  const openTickets = await db.select('tickets', 'result=eq.PENDING&select=id,legs');
+  let ticketsSettled = 0;
+  if (openTickets.length) {
+    const pickIds = [...new Set(openTickets.flatMap(t => t.legs.map(l => l.pick_id).filter(Boolean)))];
+    const rows = pickIds.length ? await db.select('picks', `id=in.(${pickIds.join(',')})&select=id,result`) : [];
+    const res = new Map(rows.map(r => [r.id, r.result]));
+    for (const t of openTickets) {
+      const legResults = t.legs.map(l => res.get(l.pick_id) ?? 'PENDING');
+      const r = settleTicket(legResults, t.legs.map(l => l.odds));
+      if (r.result !== 'PENDING') {
+        await db.patch('tickets', `id=eq.${t.id}`, { result: r.result, profit: r.profit, leg_results: legResults, settled_at: new Date().toISOString() });
+        ticketsSettled++;
+      } else if (legResults.some(x => x !== 'PENDING')) {
+        await db.patch('tickets', `id=eq.${t.id}`, { leg_results: legResults });
+      }
+    }
+  }
+  await db.patchRun(run.id, { finished_at: new Date().toISOString(), ok: true, message: `settled ${settled} of ${pending.length} pending picks, ${ticketsSettled} tickets`, api_calls: apiCalls() });
   console.log(`settled ${settled}/${pending.length}`);
 } catch (e) {
   await db.patchRun(run.id, { finished_at: new Date().toISOString(), ok: false, message: String(e.message).slice(0, 500) });

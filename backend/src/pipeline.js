@@ -6,6 +6,7 @@ import { matchScore } from './providers/teamMatch.js';
 import { analyseFixture } from './engine/analysis.js';
 import { DEFAULT_CONFIG } from './engine/value.js';
 import { demoBundles } from './demo.js';
+import { buildTickets } from './engine/tickets.js';
 import { apiCalls } from './http.js';
 
 const iso = d => d.toISOString().slice(0, 10);
@@ -95,6 +96,15 @@ export async function runPipeline({ demo = process.env.DEMO === '1' } = {}) {
       // keep the latest price visible on existing picks without touching the published odds
       for (const p of picks) await db.patch('picks', `fixture_id=eq.${p.fixture_id}&market_id=eq.${encodeURIComponent(p.market_id)}&result=eq.PENDING`, { latest_odds: p.odds, latest_odds_at: new Date().toISOString() });
     }
+    // 6. daily tickets built from the published picks (only missing slots are filled; published tickets never change)
+    const day = iso(now);
+    const horizon = new Date(now.getTime() + 36 * 3600e3).toISOString();
+    const poolRows = await db.select('picks', `result=eq.PENDING&is_demo=eq.${demo}&kickoff=gt.${now.toISOString()}&kickoff=lt.${horizon}&select=*`);
+    const existing = await db.select('tickets', `ticket_date=eq.${day}&is_demo=eq.${demo}&select=slot,legs`);
+    const fresh = buildTickets(poolRows, existing, cfg, now);
+    const tRows = fresh.map(t => ({ ...t, ticket_date: day, is_demo: demo }));
+    if (tRows.length) await db.insertIgnore('tickets', tRows, 'ticket_date,slot,is_demo');
+    msg = `${msg ? msg + '; ' : ''}tickets: ${existing.length + tRows.length}/3`;
     await db.patchRun(run.id, { finished_at: new Date().toISOString(), ok: true, fixtures_seen: seen, fixtures_analysed: analysed, picks_published: published, message: msg || 'OK', api_calls: apiCalls() });
     console.log(`pipeline ok: seen=${seen} analysed=${analysed} published=${published} calls=${apiCalls()}`);
   } catch (e) {

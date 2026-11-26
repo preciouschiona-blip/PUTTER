@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.putter.app.data.PickDto
 import com.putter.app.domain.Perf
 import com.putter.app.domain.fmtDayTime
+import com.putter.app.domain.fmtTime
 import com.putter.app.domain.parseTime
 import java.util.Locale
 
@@ -165,3 +166,60 @@ fun BulletList(items: List<String>?, color: Color = White) {
 
 @Composable
 fun mutedStyle() = MaterialTheme.typography.bodySmall
+
+@Composable
+fun TicketCard(t: com.putter.app.data.TicketDto, stake: Double = 10.0, compact: Boolean = false) {
+    val first = parseTime(t.firstKickoff)
+    AppCard {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(t.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
+            GradeChip(t.grade, t.isDemo == true)
+        }
+        Text("First kick-off ${fmtDayTime(first)} · ${t.legs.size} selections", color = Grey, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Combined odds", color = Grey, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            Text(f2(t.combinedOdds), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = Green)
+        }
+        Spacer(Modifier.height(6.dp))
+        t.legs.forEachIndexed { i, l ->
+            val r = t.legResults?.getOrNull(i)
+            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${l.homeTeam} v ${l.awayTeam}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("${l.selectionLabel} · ${l.marketLabel ?: ""} · ${fmtTime(parseTime(l.kickoff))}", color = Grey, fontSize = 11.sp)
+                    if (l.banker == true) Text("Strongest selection of the day", color = Green, fontSize = 10.sp)
+                }
+                if (r != null && r != "PENDING") Text(r, color = when (r) { "WON" -> Green; "LOST" -> Red; else -> Grey }, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 8.dp))
+                Text(f2(l.odds), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+        if (!compact) {
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Stat("Est. chance all win", pct(t.probability))
+                Stat("Expected value", t.ev?.let { signed(it * 100) + "%" } ?: "–", if ((t.ev ?: 0.0) > 0) Green else Red)
+                Stat("Risk", t.risk ?: "–", Amber)
+            }
+            Text("${f2(stake)} staked would return ${f2(stake * t.combinedOdds)} if every selection wins.", color = Grey, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+            t.note?.let { Text(it, color = Amber, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
+            Text("Every selection must win. Most tickets with odds this high lose, so stake only small amounts you can afford to lose.", color = Grey, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+        if (t.result != "PENDING") Text("Result: ${t.result}", color = when (t.result) { "WON" -> Green; "LOST" -> Red; else -> Grey }, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
+    }
+}
+
+@Composable
+fun TicketPerfGrid(p: com.putter.app.domain.TicketPerf) {
+    AppCard {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Stat("Tickets", "${p.total}"); Stat("Won", "${p.won}", Green); Stat("Lost", "${p.lost}", Red); Stat("Void", "${p.void}"); Stat("Pending", "${p.pending}", Amber)
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Stat("Hit rate", "${String.format(Locale.US, "%.1f", p.hitPct)}%")
+            Stat("Avg odds", if (p.total > 0) f2(p.avgOdds) else "–")
+            Stat("ROI", signed(p.roi) + "%", if (p.roi >= 0) Green else Red)
+            Stat("Profit (units)", signed(p.profit, 2), if (p.profit >= 0) Green else Red)
+        }
+    }
+}

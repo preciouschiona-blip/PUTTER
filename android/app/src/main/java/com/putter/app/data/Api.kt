@@ -17,6 +17,13 @@ interface SupabaseApi {
         @Query("limit") limit: Int = 1000,
     ): List<PickDto>
 
+    @GET("rest/v1/tickets")
+    suspend fun tickets(
+        @Query("select") select: String = "*",
+        @Query("order") order: String = "ticket_date.desc,slot.asc",
+        @Query("limit") limit: Int = 600,
+    ): List<TicketDto>
+
     @GET("rest/v1/fixtures")
     suspend fun fixtures(
         @Query("select") select: String = "*",

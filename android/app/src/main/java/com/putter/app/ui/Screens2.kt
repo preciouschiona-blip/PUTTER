@@ -93,10 +93,16 @@ fun AccumulatorScreen(s: UiState) {
 
 @Composable
 fun ResultsScreen(s: UiState, onPick: (PickDto) -> Unit) {
+    var mode by rememberSaveable { mutableStateOf(0) }
     var greenOnly by rememberSaveable { mutableStateOf(true) }
     val base = s.picks.filter { it.isDemo != true }
     val list = if (greenOnly) base.filter { it.grade == "GREEN" } else base
     Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = mode == 0, onClick = { mode = 0 }, label = { Text("Tickets") })
+            FilterChip(selected = mode == 1, onClick = { mode = 1 }, label = { Text("Single picks") })
+        }
+        if (mode == 0) { TicketResults(s); return@Column }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = greenOnly, onClick = { greenOnly = true }, label = { Text("GREEN only") })
             FilterChip(selected = !greenOnly, onClick = { greenOnly = false }, label = { Text("All published") })
@@ -171,4 +177,14 @@ fun ProfileScreen(s: UiState, loading: Boolean, error: String?, onRefresh: () ->
             Text("Putter analyses fixtures with form, injury and bookmaker data. Odds come from a live odds provider and are never invented. Picks without verified odds are not recommended.", color = Grey, fontSize = 12.sp)
         }
     }
+}
+
+@Composable
+fun TicketResults(s: UiState) {
+    val real = s.tickets.filter { it.isDemo != true }
+    Text("Every published ticket is kept permanently, including losers. Flat 1-unit stake per ticket; a ticket only wins when every selection wins.", color = Grey, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
+    TicketPerfGrid(com.putter.app.domain.ticketPerf(real))
+    SectionTitle("Ticket history")
+    if (real.isEmpty()) EmptyState("No tickets recorded yet", "The record starts with the first published ticket.")
+    real.sortedByDescending { parseTime(it.firstKickoff) }.take(60).forEach { TicketCard(it, compact = true) }
 }

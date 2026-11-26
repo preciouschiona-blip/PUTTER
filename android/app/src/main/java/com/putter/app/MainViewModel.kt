@@ -10,6 +10,7 @@ import com.putter.app.data.FixtureDto
 import com.putter.app.data.PickDto
 import com.putter.app.data.Repository
 import com.putter.app.data.RunDto
+import com.putter.app.data.TicketDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 
 data class UiState(
     val picks: List<PickDto> = emptyList(),
+    val tickets: List<TicketDto> = emptyList(),
     val fixtures: List<FixtureDto> = emptyList(),
     val lastSyncMs: Long? = null,
     val lastRun: RunDto? = null,
@@ -32,7 +34,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val loading = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
 
-    val state: StateFlow<UiState> = combine(repo.picksFlow, repo.fixturesFlow, repo.metaFlow) { p, f, m ->
+    val state: StateFlow<UiState> = combine(repo.picksFlow, repo.fixturesFlow, repo.ticketsFlow, repo.metaFlow) { p, f, t, m ->
         val meta = m.associate { it.key to it.value }
         val cfg = meta["config"]?.let { json ->
             runCatching {
@@ -45,7 +47,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }.getOrNull()
         } ?: emptyMap()
         UiState(
-            picks = p.map { repo.pick(it) }, fixtures = f.map { repo.fixture(it) },
+            picks = p.map { repo.pick(it) }, tickets = t.map { repo.ticket(it) }, fixtures = f.map { repo.fixture(it) },
             lastSyncMs = meta["lastSync"]?.toLongOrNull(),
             lastRun = meta["lastRun"]?.let { repo.fromJson(it, RunDto::class.java) },
             settings = cfg, loaded = true,

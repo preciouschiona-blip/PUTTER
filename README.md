@@ -18,6 +18,20 @@ GitHub Actions (scheduled)            Supabase (Postgres)            Android app
 * `android/`: native app (Kotlin, Jetpack Compose, MVVM, Retrofit, Room, WorkManager). Dark navy and electric green theme. Sections: Home, Today's Picks, Fixtures, Analysis, Accumulator, Results, Profile.
 * `backend/sql/schema.sql`: tables, row-level security and triggers that make published picks immutable and undeletable.
 
+## Daily tickets
+
+Each day Putter publishes up to **three tickets**, each a multi-selection slip built from the day's qualified single picks:
+
+1. **Safest mix**: the most probable combination of three selections.
+2. **Value mix**: three or four selections with the best expected value.
+3. **High odds**: four selections aiming for combined odds of about 20 or more.
+
+Rules: one selection per match inside a ticket; different market types are mixed where the pool allows; a match is reused in a second ticket only when it is a "banker" (GREEN, probability ≥ 62%, confidence ≥ 70) and at most one banker is shared between two tickets. If fewer than three valid tickets exist, fewer are shown, because Putter never pads tickets with weak selections. Tickets are stored permanently and settled automatically (a ticket wins only if every selection wins; void legs drop out). Probabilities and expected value are estimates, and high-odds tickets lose far more often than they win.
+
+## Download
+
+Every successful build on `main` updates the **latest** release: `https://github.com/preciouschiona-blip/PUTTER/releases/tag/latest` (direct file: `.../releases/download/latest/Putter.apk`). Without the signing secrets, builds are signed with a throwaway key, so installing a newer build over an older one may require uninstalling first.
+
 ## One-time setup
 
 1. **Supabase** (free tier is fine): create a project, open the SQL editor, run `backend/sql/schema.sql`.

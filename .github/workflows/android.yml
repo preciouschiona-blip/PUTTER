@@ -40,7 +40,18 @@ jobs:
         run: cp android/app/build/outputs/apk/release/app-release.apk Putter.apk
       - uses: actions/upload-artifact@v4
         with: { name: Putter-apk, path: Putter.apk }
-      - name: Publish release (tags only)
+      - name: Publish download (always-current release)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Putter (latest build)
+          body: |
+            Download **Putter.apk** below and install it on your Android phone (allow "install unknown apps" when asked).
+            Built from the latest commit on main. Football predictions are not guaranteed outcomes.
+          files: Putter.apk
+          make_latest: true
+      - name: Publish versioned release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with: { files: Putter.apk }

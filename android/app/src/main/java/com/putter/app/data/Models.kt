@@ -70,3 +70,42 @@ data class RunDto(
 )
 
 data class ConfigRow(val key: String, val value: com.google.gson.JsonElement?)
+
+data class TicketLegDto(
+    @SerializedName("pick_id") val pickId: String?,
+    @SerializedName("fixture_id") val fixtureId: String,
+    val kickoff: String,
+    val league: String?,
+    @SerializedName("home_team") val homeTeam: String,
+    @SerializedName("away_team") val awayTeam: String,
+    @SerializedName("market_id") val marketId: String?,
+    @SerializedName("market_label") val marketLabel: String?,
+    @SerializedName("selection_label") val selectionLabel: String,
+    val odds: Double,
+    val p: Double?,
+    val grade: String?,
+    val bookmaker: String?,
+    val banker: Boolean?,
+)
+
+data class TicketDto(
+    val id: String,
+    @SerializedName("ticket_date") val ticketDate: String,
+    val slot: Int,
+    val name: String,
+    val strategy: String?,
+    val grade: String,
+    val legs: List<TicketLegDto>,
+    @SerializedName("combined_odds") val combinedOdds: Double,
+    val probability: Double,
+    val ev: Double?,
+    val risk: String?,
+    @SerializedName("first_kickoff") val firstKickoff: String,
+    @SerializedName("last_kickoff") val lastKickoff: String,
+    val note: String?,
+    @SerializedName("is_demo") val isDemo: Boolean?,
+    @SerializedName("published_at") val publishedAt: String?,
+    val result: String,
+    val profit: Double?,
+    @SerializedName("leg_results") val legResults: List<String>?,
+)

@@ -1,6 +1,7 @@
 package com.putter.app.domain
 
 import com.putter.app.data.PickDto
+import com.putter.app.data.TicketDto
 
 data class Perf(
     val total: Int, val won: Int, val lost: Int, val void: Int, val pending: Int,
@@ -29,3 +30,18 @@ fun perf(all: List<PickDto>): Perf {
 fun groupPerf(list: List<PickDto>, key: (PickDto) -> String): List<Pair<String, Perf>> =
     list.filter { it.isDemo != true && it.result != "PENDING" }.groupBy(key).map { it.key to perf(it.value) }
         .sortedByDescending { it.second.total }
+
+data class TicketPerf(val total: Int, val won: Int, val lost: Int, val void: Int, val pending: Int, val hitPct: Double, val avgOdds: Double, val roi: Double, val profit: Double)
+
+fun ticketPerf(all: List<TicketDto>): TicketPerf {
+    val l = all.filter { it.isDemo != true }
+    val won = l.count { it.result == "WON" }; val lost = l.count { it.result == "LOST" }
+    val staked = won + lost
+    val profit = l.sumOf { if (it.result == "PENDING") 0.0 else (it.profit ?: 0.0) }
+    return TicketPerf(
+        total = l.size, won = won, lost = lost, void = l.count { it.result == "VOID" }, pending = l.count { it.result == "PENDING" },
+        hitPct = if (staked > 0) 100.0 * won / staked else 0.0,
+        avgOdds = if (l.isNotEmpty()) l.map { it.combinedOdds }.average() else 0.0,
+        roi = if (staked > 0) 100.0 * profit / staked else 0.0, profit = profit,
+    )
+}
