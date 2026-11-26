@@ -14,7 +14,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
+      - id: keys
+        name: Check required secrets
+        env:
+          SB: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          AF: ${{ secrets.API_FOOTBALL_KEY }}
+          OD: ${{ secrets.ODDS_API_KEY }}
+          EVENT: ${{ github.event_name }}
+          DEMO: ${{ inputs.demo }}
+        run: |
+          ok=true
+          if [ -z "$SB" ]; then ok=false; echo "::notice::SUPABASE_SERVICE_KEY is not set, skipping."; fi
+          if [ -z "$AF" ] || [ -z "$OD" ]; then ok=false; echo "::notice::API keys not set, skipping."; fi
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
       - name: Capture closing odds
+        if: steps.keys.outputs.ok == 'true'
         working-directory: backend
         continue-on-error: true
         env:
@@ -23,6 +37,7 @@ jobs:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: npm run closing
       - name: Settle finished matches
+        if: steps.keys.outputs.ok == 'true'
         working-directory: backend
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://rfsmywipfwpwclgjammf.supabase.co' }}
