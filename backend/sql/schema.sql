@@ -75,7 +75,7 @@ create table if not exists runs (
 );
 
 -- Track record integrity: a published recommendation can never be deleted or rewritten.
-create or replace function picks_protect() returns trigger language plpgsql as $$
+create or replace function picks_protect() returns trigger language plpgsql set search_path = '' as $$
 begin
   if tg_op = 'DELETE' then
     raise exception 'Published picks cannot be deleted';
@@ -146,7 +146,7 @@ create table if not exists tickets (
 );
 create index if not exists tickets_date_idx on tickets (ticket_date desc);
 
-create or replace function tickets_protect() returns trigger language plpgsql as $$
+create or replace function tickets_protect() returns trigger language plpgsql set search_path = '' as $$
 begin
   if tg_op = 'DELETE' then raise exception 'Published tickets cannot be deleted'; end if;
   if (new.id, new.ticket_date, new.slot, new.name, new.strategy, new.grade, new.legs, new.combined_odds, new.probability,
