@@ -6,7 +6,12 @@ plugins {
 }
 
 fun cfg(name: String): String =
-    (project.findProperty(name) as String?) ?: System.getenv(name) ?: ""
+    (project.findProperty(name) as String?)?.takeIf { it.isNotEmpty() } ?: System.getenv(name) ?: ""
+
+// Public, read-only values (the anon key can only read; row level security blocks writes).
+// A build can override them with the SUPABASE_URL / SUPABASE_ANON_KEY environment variables.
+val defaultSupabaseUrl = "https://rfsmywipfwpwclgjammf.supabase.co"
+val defaultSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmc215d2lwZndwd2NsZ2phbW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU3MTgyOTIsImV4cCI6MjExMTI5NDI5Mn0.KiHgewHRmPU5_5xu9K_i8WdP195xJzZa5HUrGuJrzMM"
 
 android {
     namespace = "com.putter.app"
@@ -19,8 +24,8 @@ android {
         versionCode = 2
         versionName = "1.1.0"
         // Public, read-only values (anon key is protected by row level security; writes need the service key).
-        buildConfigField("String", "SUPABASE_URL", "\"${cfg("SUPABASE_URL")}\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${cfg("SUPABASE_ANON_KEY")}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${cfg("SUPABASE_URL").ifEmpty { defaultSupabaseUrl }}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${cfg("SUPABASE_ANON_KEY").ifEmpty { defaultSupabaseAnonKey }}\"")
     }
 
     signingConfigs {
