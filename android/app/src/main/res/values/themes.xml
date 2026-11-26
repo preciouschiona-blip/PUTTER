@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="putter_bg">#0B1220</color>
+    <style name="Theme.Putter" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/putter_bg</item>
+        <item name="android:statusBarColor">@color/putter_bg</item>
+        <item name="android:navigationBarColor">@color/putter_bg</item>
+    </style>
+</resources>

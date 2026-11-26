@@ -1,0 +1,34 @@
+name: Putter daily analysis
+
+on:
+  schedule:
+    - cron: '0 5 * * *'    # morning run (UTC)
+    - cron: '0 12 * * *'   # midday refresh for evening kick-offs
+  workflow_dispatch:
+    inputs:
+      demo:
+        description: 'Run with clearly flagged DEMO data (no API keys needed)'
+        type: boolean
+        default: false
+
+concurrency: putter-pipeline
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Unit tests (engine must pass before publishing)
+        working-directory: backend
+        run: npm test
+      - name: Run pipeline
+        working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          DEMO: ${{ inputs.demo && '1' || '0' }}
+        run: npm run pipeline

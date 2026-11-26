@@ -1,0 +1,14 @@
+{
+  "name": "putter-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Putter analysis engine and scheduled pipeline (runs on GitHub Actions, writes to Supabase)",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "pipeline": "node src/pipeline.js",
+    "settle": "node src/settle-run.js",
+    "closing": "node src/closing-run.js"
+  },
+  "engines": { "node": ">=20" }
+}
