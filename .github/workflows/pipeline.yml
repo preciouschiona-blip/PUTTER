@@ -42,8 +42,14 @@ jobs:
         run: |
           ok=true
           if [ -z "$SB" ]; then ok=false; echo "::notice::SUPABASE_SERVICE_KEY is not set, skipping."; fi
-          if [ "$DEMO" != "1" ] && { [ -z "$AF" ] || [ -z "$OD" ]; }; then ok=false; echo "::notice::API_FOOTBALL_KEY / ODDS_API_KEY not set, skipping (tick demo to run sample data)."; fi
+          if [ "$DEMO" != "1" ]; then
+            [ -z "$AF" ] && { ok=false; echo "::error title=Missing secret::API_FOOTBALL_KEY is empty or not found. Add it under Settings > Secrets and variables > Actions > Repository secrets, with exactly that name."; }
+            [ -z "$OD" ] && { ok=false; echo "::error title=Missing secret::ODDS_API_KEY is empty or not found. Add it under Settings > Secrets and variables > Actions > Repository secrets, with exactly that name."; }
+            [ -n "$AF" ] && echo "API_FOOTBALL_KEY found (${#AF} characters)"
+            [ -n "$OD" ] && echo "ODDS_API_KEY found (${#OD} characters)"
+          fi
           echo "ok=$ok" >> "$GITHUB_OUTPUT"
+          if [ "$ok" != "true" ] && [ "$EVENT" != "schedule" ]; then exit 1; fi
       - name: Unit tests (engine must pass before publishing)
         if: steps.keys.outputs.ok == 'true'
         working-directory: backend
