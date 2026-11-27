@@ -10,13 +10,13 @@ export async function activeSoccerSports() {
   return json.filter(s => s.group === 'Soccer' && s.active).map(s => s.key);
 }
 
-export async function fetchOdds(sportKey, markets = 'h2h,totals') {
-  const { json, headers } = await getJson(`${BASE}/sports/${sportKey}/odds?apiKey=${key()}&regions=eu,uk&markets=${markets}&oddsFormat=decimal&dateFormat=iso`);
+export async function fetchOdds(sportKey, markets = 'h2h,totals', regions = 'eu') {
+  const { json, headers } = await getJson(`${BASE}/sports/${sportKey}/odds?apiKey=${key()}&regions=${regions}&markets=${markets}&oddsFormat=decimal&dateFormat=iso`);
   return { events: json, remaining: headers.get('x-requests-remaining') };
 }
-export async function fetchEventMarkets(sportKey, eventId, markets = 'btts,draw_no_bet,double_chance') {
+export async function fetchEventMarkets(sportKey, eventId, markets = 'btts,draw_no_bet,double_chance', regions = 'eu') {
   try {
-    const { json } = await getJson(`${BASE}/sports/${sportKey}/events/${eventId}/odds?apiKey=${key()}&regions=eu,uk&markets=${markets}&oddsFormat=decimal&dateFormat=iso`);
+    const { json } = await getJson(`${BASE}/sports/${sportKey}/events/${eventId}/odds?apiKey=${key()}&regions=${regions}&markets=${markets}&oddsFormat=decimal&dateFormat=iso`);
     return json;
   } catch { return null; }
 }

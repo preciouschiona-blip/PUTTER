@@ -22,6 +22,8 @@ export const DEFAULT_CONFIG = {
   min_pick_lead_minutes: 10,
   max_fixtures_per_run: 25,
   lookahead_days: 2,
+  odds_regions: 'eu',          // each extra region multiplies Odds API credit use
+  odds_extra_markets: false,   // BTTS / DNB / double chance cost extra credits per match
 };
 
 /**

@@ -2,8 +2,7 @@ name: Putter daily analysis
 
 on:
   schedule:
-    - cron: '0 5 * * *'    # morning run (UTC)
-    - cron: '0 12 * * *'   # midday refresh for evening kick-offs
+    - cron: '0 5 * * *'    # one run a day keeps free API plans inside their limits
   push:
     paths: ['.github/run-pipeline.txt']   # edit that file (first line "demo" or "live") to trigger a run
   workflow_dispatch:

@@ -47,7 +47,7 @@ export async function runPipeline({ demo = process.env.DEMO === '1' } = {}) {
       // 2. odds
       const events = [];
       for (const sk of sportKeys) {
-        try { const { events: evs } = await oa.fetchOdds(sk); for (const e of evs) events.push({ ...e, sport_key: sk }); }
+        try { const { events: evs } = await oa.fetchOdds(sk, 'h2h,totals', cfg.odds_regions); for (const e of evs) events.push({ ...e, sport_key: sk }); }
         catch (e) { console.warn(`odds ${sk}: ${e.message}`); }
       }
       // 3. match odds events to fixtures
@@ -65,7 +65,7 @@ export async function runPipeline({ demo = process.env.DEMO === '1' } = {}) {
       // 4. gather data and build bundles
       for (const { fx, ev } of batch) {
         try {
-          const extra = await oa.fetchEventMarkets(ev.sport_key, ev.id);
+          const extra = cfg.odds_extra_markets ? await oa.fetchEventMarkets(ev.sport_key, ev.id, undefined, cfg.odds_regions) : null;
           const odds = oa.summariseEvent(ev, ...(extra ? [{ ...extra, home_team: ev.home_team, away_team: ev.away_team }] : []));
           const [hf, af, inj, table, scorers] = await Promise.all([fb.teamForm(fx.homeId), fb.teamForm(fx.awayId), fb.injuries(fx.id), fb.standings(fx.leagueId, fx.season), fb.topScorers(fx.leagueId, fx.season)]);
           bundles.push({
