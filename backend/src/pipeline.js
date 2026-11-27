@@ -48,7 +48,7 @@ export async function runPipeline({ demo = process.env.DEMO === '1' } = {}) {
       const events = [];
       for (const sk of sportKeys) {
         try { const { events: evs } = await oa.fetchOdds(sk, 'h2h,totals', cfg.odds_regions); for (const e of evs) events.push({ ...e, sport_key: sk }); }
-        catch (e) { console.warn(`odds ${sk}: ${e.message}`); }
+        catch (e) { console.warn(`::warning title=Odds fetch failed::${sk}: ${String(e.message).slice(0, 200)}`); }
       }
       // 3. match odds events to fixtures
       const matched = [], noOdds = [];
@@ -57,7 +57,7 @@ export async function runPipeline({ demo = process.env.DEMO === '1' } = {}) {
         for (const ev of events) { const s = matchScore(fx, ev); if (s > bs) { bs = s; best = ev; } }
         (best ? matched : noOdds).push({ fx, ev: best });
       }
-      await db.upsert('fixtures', noOdds.map(({ fx }) => fixtureRow(fx, { league_id: fx.leagueId, analysis_status: 'no_odds', analysis_note: 'No bookmaker odds found; not analysed for recommendation' })), 'id');
+      // fixtures without bookmaker odds are not stored: they can never be recommended
       matched.sort((a, b) => new Date(a.fx.kickoff) - new Date(b.fx.kickoff));
       const batch = matched.slice(0, cfg.max_fixtures_per_run);
       await db.upsert('fixtures', matched.slice(cfg.max_fixtures_per_run).map(({ fx }) => fixtureRow(fx, { analysis_status: 'pending', analysis_note: 'Beyond this run\'s API budget' })), 'id');
@@ -75,7 +75,10 @@ export async function runPipeline({ demo = process.env.DEMO === '1' } = {}) {
             flags: { hasStandings: table.size > 0, injuriesChecked: inj.ok }, odds,
             meta: { leagueId: fx.leagueId, sport_key: ev.sport_key, odds_event_id: ev.id },
           });
-        } catch (e) { console.warn(`fixture ${fx.id}: ${e.message}`); }
+        } catch (e) {
+          console.warn(`::warning title=Fixture skipped::${fx.home} v ${fx.away}: ${String(e.message).slice(0, 300)}`);
+          await db.upsert('fixtures', [fixtureRow(fx, { analysis_status: 'skipped', analysis_note: `Data fetch failed: ${String(e.message).slice(0, 180)}` })], 'id');
+        }
       }
     }
 
