@@ -32,16 +32,33 @@ export async function fixturesByIds(ids) {
   for (let i = 0; i < ids.length; i += 20) out.push(...(await call('fixtures', { ids: ids.slice(i, i + 20).join('-') })).map(toFixture));
   return out;
 }
-/** Recent finished matches for a team from the team's own perspective, newest first. */
-export async function teamForm(teamId, n = 15) {
-  const rows = await call('fixtures', { team: teamId, last: n });
-  return rows.filter(r => ['FT', 'AET', 'PEN'].includes(r.fixture.status.short) && r.score?.fulltime?.home != null)
+/** Pure helper: recent finished matches for one team from a list of API fixture rows, newest first. */
+export function formFromRows(rows, teamId, n = 15) {
+  return rows.filter(r => (r.teams.home.id === teamId || r.teams.away.id === teamId) && ['FT', 'AET', 'PEN'].includes(r.fixture.status.short) && r.score?.fulltime?.home != null)
     .sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date))
+    .slice(0, n)
     .map(r => {
       const home = r.teams.home.id === teamId;
       const gf = home ? r.score.fulltime.home : r.score.fulltime.away, ga = home ? r.score.fulltime.away : r.score.fulltime.home;
       return { date: r.fixture.date, venue: home ? 'H' : 'A', gf, ga, xgf: null, xga: null, league: r.league.name };
     });
+}
+
+/**
+ * Recent finished matches for a team, newest first. Works on the free plan (which blocks the "last" parameter):
+ * one request per league season (cached, shared by every team in that league), with a per-team season request
+ * as a fallback for teams whose league sample is thin (for example cup competitions).
+ */
+export async function teamForm(teamId, n = 15, leagueId = null, season = null) {
+  let f = [];
+  if (leagueId && season) {
+    try { f = formFromRows(await call('fixtures', { league: leagueId, season, status: 'FT-AET-PEN' }), teamId, n); } catch { /* fall back below */ }
+  }
+  if (f.length < 8 && season) {
+    try { const g = formFromRows(await call('fixtures', { team: teamId, season, status: 'FT-AET-PEN' }), teamId, n); if (g.length > f.length) f = g; }
+    catch (e) { if (!f.length) throw e; }
+  }
+  return f;
 }
 export async function standings(leagueId, season) {
   try {

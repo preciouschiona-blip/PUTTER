@@ -67,7 +67,7 @@ export async function runPipeline({ demo = process.env.DEMO === '1' } = {}) {
         try {
           const extra = cfg.odds_extra_markets ? await oa.fetchEventMarkets(ev.sport_key, ev.id, undefined, cfg.odds_regions) : null;
           const odds = oa.summariseEvent(ev, ...(extra ? [{ ...extra, home_team: ev.home_team, away_team: ev.away_team }] : []));
-          const [hf, af, inj, table, scorers] = await Promise.all([fb.teamForm(fx.homeId), fb.teamForm(fx.awayId), fb.injuries(fx.id), fb.standings(fx.leagueId, fx.season), fb.topScorers(fx.leagueId, fx.season)]);
+          const [hf, af, inj, table, scorers] = await Promise.all([fb.teamForm(fx.homeId, 15, fx.leagueId, fx.season), fb.teamForm(fx.awayId, 15, fx.leagueId, fx.season), fb.injuries(fx.id), fb.standings(fx.leagueId, fx.season), fb.topScorers(fx.leagueId, fx.season)]);
           bundles.push({
             fixture: { id: fx.id, kickoff: fx.kickoff, league: fx.league, home: fx.home, away: fx.away, isCup: fx.isCup },
             home: { matches: hf, injuries: fb.injuryImpact(fx.homeId, inj, scorers, table) },
