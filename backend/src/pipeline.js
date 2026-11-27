@@ -3,6 +3,7 @@ import * as db from './db.js';
 import * as fb from './providers/apiFootball.js';
 import * as oa from './providers/oddsApi.js';
 import { matchScore } from './providers/teamMatch.js';
+import { formFromCache } from './providers/form.js';
 import { analyseFixture } from './engine/analysis.js';
 import { DEFAULT_CONFIG } from './engine/value.js';
 import { demoBundles } from './demo.js';
@@ -62,12 +63,36 @@ export async function runPipeline({ demo = process.env.DEMO === '1' } = {}) {
       const batch = matched.slice(0, cfg.max_fixtures_per_run);
       await db.upsert('fixtures', matched.slice(cfg.max_fixtures_per_run).map(({ fx }) => fixtureRow(fx, { analysis_status: 'pending', analysis_note: 'Beyond this run\'s API budget' })), 'id');
 
-      // 4. gather data and build bundles
+      // 4a. results history: save missing past days once (newest first), then read form from the saved history
+      const window = cfg.form_days ?? 45, budget = cfg.backfill_per_run ?? 25;
+      const doneDays = new Set((await db.select('results_days', 'select=day')).map(r => r.day));
+      let fetchedDays = 0;
+      for (let d = 1; d <= window && fetchedDays < budget; d++) {
+        const day = iso(new Date(now.getTime() - d * 86400e3));
+        if (doneDays.has(day)) continue;
+        try {
+          const rows = await fb.finishedByDate(day);
+          for (let i = 0; i < rows.length; i += 500) await db.upsert('results_cache', rows.slice(i, i + 500), 'fixture_id');
+          await db.upsert('results_days', [{ day, row_count: rows.length }], 'day');
+          fetchedDays++;
+        } catch (e) {
+          console.warn(`::warning title=History fetch failed::${day}: ${String(e.message).slice(0, 250)}`);
+          break;
+        }
+      }
+      msg = `history days saved this run: ${fetchedDays}`;
+      const teamIds = [...new Set(batch.flatMap(({ fx }) => [fx.homeId, fx.awayId]))];
+      const since = new Date(now.getTime() - window * 86400e3).toISOString();
+      const cacheRows = teamIds.length
+        ? await db.select('results_cache', `kickoff=gte.${since}&or=(home_id.in.(${teamIds.join(',')}),away_id.in.(${teamIds.join(',')}))&order=kickoff.desc&limit=5000`)
+        : [];
+      // 4b. gather data and build bundles
       for (const { fx, ev } of batch) {
         try {
           const extra = cfg.odds_extra_markets ? await oa.fetchEventMarkets(ev.sport_key, ev.id, undefined, cfg.odds_regions) : null;
           const odds = oa.summariseEvent(ev, ...(extra ? [{ ...extra, home_team: ev.home_team, away_team: ev.away_team }] : []));
-          const [hf, af, inj, table, scorers] = await Promise.all([fb.teamForm(fx.homeId, 15, fx.leagueId, fx.season), fb.teamForm(fx.awayId, 15, fx.leagueId, fx.season), fb.injuries(fx.id), fb.standings(fx.leagueId, fx.season), fb.topScorers(fx.leagueId, fx.season)]);
+          const [inj, table, scorers] = await Promise.all([fb.injuries(fx.id), fb.standings(fx.leagueId, fx.season), fb.topScorers(fx.leagueId, fx.season)]);
+          const hf = formFromCache(cacheRows, fx.homeId), af = formFromCache(cacheRows, fx.awayId);
           bundles.push({
             fixture: { id: fx.id, kickoff: fx.kickoff, league: fx.league, home: fx.home, away: fx.away, isCup: fx.isCup },
             home: { matches: hf, injuries: fb.injuryImpact(fx.homeId, inj, scorers, table) },

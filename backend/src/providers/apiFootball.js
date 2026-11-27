@@ -5,13 +5,17 @@ const BASE = 'https://v3.football.api-sports.io';
 const key = () => process.env.API_FOOTBALL_KEY;
 const cache = new Map();
 
-async function call(path, params) {
+// Results and failures are both cached for the run, so a blocked endpoint costs one request, not one per match.
+function call(path, params) {
   const url = `${BASE}/${path}?${new URLSearchParams(params)}`;
-  if (cache.has(url)) return cache.get(url);
-  const { json } = await getJson(url, { 'x-apisports-key': key() });
-  if (json.errors && Object.keys(json.errors).length && !Array.isArray(json.errors)) throw new Error(`API-Football: ${JSON.stringify(json.errors)}`);
-  cache.set(url, json.response ?? []);
-  return json.response ?? [];
+  if (!cache.has(url)) {
+    cache.set(url, (async () => {
+      const { json } = await getJson(url, { 'x-apisports-key': key() });
+      if (json.errors && Object.keys(json.errors).length && !Array.isArray(json.errors)) throw new Error(`API-Football: ${JSON.stringify(json.errors)}`);
+      return json.response ?? [];
+    })());
+  }
+  return cache.get(url);
 }
 
 export const available = () => !!key();
@@ -32,33 +36,16 @@ export async function fixturesByIds(ids) {
   for (let i = 0; i < ids.length; i += 20) out.push(...(await call('fixtures', { ids: ids.slice(i, i + 20).join('-') })).map(toFixture));
   return out;
 }
-/** Pure helper: recent finished matches for one team from a list of API fixture rows, newest first. */
-export function formFromRows(rows, teamId, n = 15) {
-  return rows.filter(r => (r.teams.home.id === teamId || r.teams.away.id === teamId) && ['FT', 'AET', 'PEN'].includes(r.fixture.status.short) && r.score?.fulltime?.home != null)
-    .sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date))
-    .slice(0, n)
-    .map(r => {
-      const home = r.teams.home.id === teamId;
-      const gf = home ? r.score.fulltime.home : r.score.fulltime.away, ga = home ? r.score.fulltime.away : r.score.fulltime.home;
-      return { date: r.fixture.date, venue: home ? 'H' : 'A', gf, ga, xgf: null, xga: null, league: r.league.name };
-    });
-}
-
-/**
- * Recent finished matches for a team, newest first. Works on the free plan (which blocks the "last" parameter):
- * one request per league season (cached, shared by every team in that league), with a per-team season request
- * as a fallback for teams whose league sample is thin (for example cup competitions).
- */
-export async function teamForm(teamId, n = 15, leagueId = null, season = null) {
-  let f = [];
-  if (leagueId && season) {
-    try { f = formFromRows(await call('fixtures', { league: leagueId, season, status: 'FT-AET-PEN' }), teamId, n); } catch { /* fall back below */ }
-  }
-  if (f.length < 8 && season) {
-    try { const g = formFromRows(await call('fixtures', { team: teamId, season, status: 'FT-AET-PEN' }), teamId, n); if (g.length > f.length) f = g; }
-    catch (e) { if (!f.length) throw e; }
-  }
-  return f;
+/** Finished matches (90-minute score) on one date, shaped for the results_cache table. */
+export async function finishedByDate(date) {
+  const rows = await call('fixtures', { date });
+  return rows
+    .filter(r => ['FT', 'AET', 'PEN'].includes(r.fixture.status.short) && r.score?.fulltime?.home != null && r.score?.fulltime?.away != null)
+    .map(r => ({
+      fixture_id: String(r.fixture.id), league_id: r.league.id, league: r.league.name, kickoff: r.fixture.date,
+      home_id: r.teams.home.id, away_id: r.teams.away.id, home_name: r.teams.home.name, away_name: r.teams.away.name,
+      home_goals: r.score.fulltime.home, away_goals: r.score.fulltime.away,
+    }));
 }
 export async function standings(leagueId, season) {
   try {

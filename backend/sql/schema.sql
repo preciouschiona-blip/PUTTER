@@ -174,3 +174,29 @@ grant all on all tables in schema public to service_role;
 grant select on all tables in schema public to anon;
 alter default privileges in schema public grant all on tables to service_role;
 alter default privileges in schema public grant select on tables to anon;
+
+-- ---------------------------------------------------------------------------
+-- Results cache: finished matches saved once per day, used to build team form on API plans without history access
+-- ---------------------------------------------------------------------------
+create table if not exists results_cache (
+  fixture_id text primary key,
+  league_id integer,
+  league text,
+  kickoff timestamptz not null,
+  home_id integer not null,
+  away_id integer not null,
+  home_name text,
+  away_name text,
+  home_goals integer not null,
+  away_goals integer not null
+);
+create index if not exists results_cache_home_idx on results_cache (home_id, kickoff desc);
+create index if not exists results_cache_away_idx on results_cache (away_id, kickoff desc);
+create table if not exists results_days (
+  day date primary key,
+  row_count integer,
+  fetched_at timestamptz not null default now()
+);
+alter table results_cache enable row level security;
+alter table results_days enable row level security;
+grant all on results_cache, results_days to service_role;
